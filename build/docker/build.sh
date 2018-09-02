@@ -9,10 +9,13 @@ if ! which go > /dev/null; then
 	exit 1
 fi
 
-BIN_DIR="$(pwd)/tmp/_output/bin"
+BIN_DIR="$(pwd)/build/_output/bin"
 mkdir -p ${BIN_DIR}
 PROJECT_NAME="rds-operator"
 REPO_PATH="github.com/coldog/rds-operator"
 BUILD_PATH="${REPO_PATH}/cmd/${PROJECT_NAME}"
 echo "building "${PROJECT_NAME}"..."
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ${BIN_DIR}/${PROJECT_NAME} $BUILD_PATH
+
+echo "building container ${IMAGE}..."
+docker build -t "${IMAGE}" -f build/docker/Dockerfile .

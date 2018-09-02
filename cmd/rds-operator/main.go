@@ -5,11 +5,10 @@ import (
 	"runtime"
 	"time"
 
-	stub "github.com/coldog/rds-operator/pkg/stub"
-	sdk "github.com/operator-framework/operator-sdk/pkg/sdk"
-	k8sutil "github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
+	"github.com/coldog/rds-operator/pkg/rds"
+	"github.com/operator-framework/operator-sdk/pkg/sdk"
+	"github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-
 	"github.com/sirupsen/logrus"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -25,6 +24,11 @@ func main() {
 
 	sdk.ExposeMetricsPort()
 
+	handler, err := rds.NewHandler()
+	if err != nil {
+		logrus.Fatalf("failed init handler: %v", err)
+	}
+
 	resource := "rds.aws.com/v1alpha1"
 	kind := "Database"
 	namespace, err := k8sutil.GetWatchNamespace()
@@ -34,6 +38,6 @@ func main() {
 	resyncPeriod := time.Duration(5) * time.Second
 	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
 	sdk.Watch(resource, kind, namespace, resyncPeriod)
-	sdk.Handle(stub.NewHandler())
-	sdk.Run(context.TODO())
+	sdk.Handle(handler)
+	sdk.Run(context.Background())
 }

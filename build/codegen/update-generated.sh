@@ -9,4 +9,4 @@ deepcopy \
 github.com/coldog/rds-operator/pkg/generated \
 github.com/coldog/rds-operator/pkg/apis \
 rds:v1alpha1 \
---go-header-file "./tmp/codegen/boilerplate.go.txt"
+--go-header-file "./build/codegen/boilerplate.go.txt"
