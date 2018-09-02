@@ -13,6 +13,7 @@ const (
 	groupName = "rds.aws.com"
 )
 
+// SchemeBuilder types.
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	AddToScheme   = SchemeBuilder.AddToScheme
