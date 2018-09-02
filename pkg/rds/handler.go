@@ -9,10 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	"github.com/coldog/rds-operator/pkg/apis/rds/v1alpha1"
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // SDK Represents the operator SDK.
@@ -44,10 +45,18 @@ type Handler struct {
 	sdk SDK
 }
 
+func dbName(o *v1alpha1.Database) string { return o.Namespace + "-" + o.Name }
+
+func secretName(o *v1alpha1.Database) string { return o.Name + "-db-credentials" }
+
 // Handle will handle a specific event.
 func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 	switch o := event.Object.(type) {
 	case *v1alpha1.Database:
+		if event.Deleted {
+			return h.delete(o)
+		}
+
 		if o.Status.State == v1alpha1.StateCreated ||
 			o.Status.State == v1alpha1.StateFailure {
 			return nil
@@ -69,6 +78,8 @@ func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 }
 
 func (h *Handler) setStatus(o *v1alpha1.Database, status string, err error) error {
+	log.WithField("db", dbName(o)).WithField("state", status).Debug("set status")
+
 	copy := o.DeepCopy()
 	copy.Status.State = status
 	if err != nil {
@@ -77,16 +88,28 @@ func (h *Handler) setStatus(o *v1alpha1.Database, status string, err error) erro
 	return h.sdk.Update(copy)
 }
 
+func (h *Handler) delete(cr *v1alpha1.Database) error {
+	log.WithField("db", dbName(cr)).Debug("deleteing db")
+
+	_, err := h.rds.DeleteDBInstance(&rds.DeleteDBInstanceInput{
+		DBInstanceIdentifier: str(dbName(cr)),
+	})
+	if err != nil {
+		log.WithError(err).WithField("db", dbName(cr)).Error("deletion failed")
+	}
+	return err
+}
+
 func (h *Handler) create(o *v1alpha1.Database) error {
 	err := h.getDB(o)
 	if err == nil {
-		logrus.Infof("database already exists: %s", o.Name)
+		log.WithField("db", dbName(o)).Info("db already exists")
 		return nil
 	}
 
 	db, err := h.createDB(o)
 	if err != nil {
-		logrus.Infof("database creation failed: %v", err)
+		log.WithField("db", dbName(o)).WithError(err).Error("db creation failed")
 		return err
 	}
 
@@ -95,7 +118,7 @@ func (h *Handler) create(o *v1alpha1.Database) error {
 		if errors.IsAlreadyExists(err) {
 			return nil
 		}
-		logrus.Errorf("failed to create secret: %v", err)
+		log.WithField("db", dbName(o)).WithError(err).Error("secret creation failed")
 		return err
 	}
 
@@ -103,7 +126,8 @@ func (h *Handler) create(o *v1alpha1.Database) error {
 }
 
 func (h *Handler) createSecret(cr *v1alpha1.Database, db *rds.DBInstance) *corev1.Secret {
-	logrus.Infof("creating secret for database: %+v", db)
+	log.WithField("db", dbName(cr)).Debug("creating secret")
+
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -112,9 +136,16 @@ func (h *Handler) createSecret(cr *v1alpha1.Database, db *rds.DBInstance) *corev
 		ObjectMeta: metav1.ObjectMeta{
 			ClusterName: cr.ObjectMeta.ClusterName,
 			Namespace:   cr.ObjectMeta.Namespace,
-			Name:        cr.ObjectMeta.Name + "-db-credentials",
+			Name:        secretName(cr),
 			Labels:      cr.Labels,
 			Annotations: map[string]string{"rds.aws.com/database": cr.Name},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(cr, schema.GroupVersionKind{
+					Group:   v1alpha1.SchemeGroupVersion.Group,
+					Version: v1alpha1.SchemeGroupVersion.Version,
+					Kind:    "Database",
+				}),
+			},
 		},
 		Data: map[string][]byte{
 			"username": encStr(cr.Spec.Username),
@@ -131,16 +162,20 @@ func (h *Handler) createSecret(cr *v1alpha1.Database, db *rds.DBInstance) *corev
 }
 
 func (h *Handler) getDB(cr *v1alpha1.Database) error {
+	log.WithField("db", dbName(cr)).Debug("fetching db")
+
 	_, err := h.rds.DescribeDBInstances(&rds.DescribeDBInstancesInput{
-		DBInstanceIdentifier: str(cr.Namespace + "-" + cr.Name),
+		DBInstanceIdentifier: str(dbName(cr)),
 	})
 	return err
 }
 
 func (h *Handler) createDB(cr *v1alpha1.Database) (*rds.DBInstance, error) {
+	log.WithField("db", dbName(cr)).Debug("creating db")
+
 	spec := cr.Spec
 	out, err := h.rds.CreateDBInstance(&rds.CreateDBInstanceInput{
-		DBInstanceIdentifier:    str(cr.Namespace + "-" + cr.Name),
+		DBInstanceIdentifier:    str(dbName(cr)),
 		MasterUsername:          str(spec.Username),
 		MasterUserPassword:      str(spec.Password),
 		DBName:                  str(spec.Database),
@@ -157,8 +192,7 @@ func (h *Handler) createDB(cr *v1alpha1.Database) (*rds.DBInstance, error) {
 		StorageType:             str(spec.StorageType),
 		MultiAZ:                 bo(spec.MultiAZ),
 		StorageEncrypted:        bo(spec.Encrypted),
-		DBSecurityGroups:        strs(spec.DBSecurityGroups),
-		VpcSecurityGroupIds:     strs(spec.VPCSecurityGroups),
+		VpcSecurityGroupIds:     strs(spec.SecurityGroups),
 	})
 	return out.DBInstance, err
 }

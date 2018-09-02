@@ -49,8 +49,7 @@ type DatabaseSpec struct {
 	MultiAZ                 bool     `json:"multiAz"`
 	Encrypted               bool     `json:"encrypted"`
 	StorageType             string   `json:"storageType"`
-	DBSecurityGroups        []string `json:"dbSecurityGroups"`
-	VPCSecurityGroups       []string `json:"vpcSecurityGroups"`
+	SecurityGroups          []string `json:"securityGroups"`
 }
 
 // Defaults will set default configuration.

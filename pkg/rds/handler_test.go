@@ -10,11 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	"github.com/coldog/rds-operator/pkg/apis/rds/v1alpha1"
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func init() { logrus.SetLevel(logrus.DebugLevel) }
 
 type mockRDS struct {
 	rdsiface.RDSAPI
@@ -29,6 +33,11 @@ func (m *mockRDS) DescribeDBInstances(input *rds.DescribeDBInstancesInput) (*rds
 func (m *mockRDS) CreateDBInstance(input *rds.CreateDBInstanceInput) (*rds.CreateDBInstanceOutput, error) {
 	args := m.Called(input)
 	return args.Get(0).(*rds.CreateDBInstanceOutput), args.Error(1)
+}
+
+func (m *mockRDS) DeleteDBInstance(input *rds.DeleteDBInstanceInput) (*rds.DeleteDBInstanceOutput, error) {
+	args := m.Called(input)
+	return &rds.DeleteDBInstanceOutput{}, args.Error(0)
 }
 
 type mockSDK struct {
@@ -72,7 +81,16 @@ func TestHandler_Run(t *testing.T) {
 	}, nil)
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	s.AssertExpectations(t)
@@ -84,6 +102,14 @@ func TestHandler_AlreadySet(t *testing.T) {
 
 	h.Handle(context.Background(), sdk.Event{
 		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
 			Status: v1alpha1.DatabaseStatus{State: v1alpha1.StateCreated},
 		},
 	})
@@ -102,7 +128,16 @@ func TestHandler_StatusFail(t *testing.T) {
 	s.On("Update", mock.Anything).Return(errors.New("failure"))
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	r.AssertNotCalled(t, "DescribeDBInstances")
@@ -121,7 +156,16 @@ func TestHandler_AlreadyExists(t *testing.T) {
 	)
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	require.Equal(t, v1alpha1.StateCreated, s.obj.(*v1alpha1.Database).Status.State)
@@ -148,7 +192,16 @@ func TestHandler_CreationFailure(t *testing.T) {
 	}, errors.New("test-error"))
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	require.Equal(t, v1alpha1.StateFailure, s.obj.(*v1alpha1.Database).Status.State)
@@ -178,7 +231,16 @@ func TestHandler_CreateSecretFailure(t *testing.T) {
 	}, nil)
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	require.Equal(t, v1alpha1.StateFailure, s.obj.(*v1alpha1.Database).Status.State)
@@ -210,10 +272,42 @@ func TestHandler_CreateSecretExisting(t *testing.T) {
 	}, nil)
 
 	h.Handle(context.Background(), sdk.Event{
-		Object: &v1alpha1.Database{},
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
 	})
 
 	require.Equal(t, v1alpha1.StateCreated, s.obj.(*v1alpha1.Database).Status.State)
+
+	s.AssertExpectations(t)
+	r.AssertExpectations(t)
+}
+
+func TestHandler_Delete(t *testing.T) {
+	r, s, h := handler()
+
+	r.On("DeleteDBInstance", mock.Anything).Return(nil)
+
+	h.Handle(context.Background(), sdk.Event{
+		Deleted: true,
+		Object: &v1alpha1.Database{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Database",
+				APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "test",
+			},
+		},
+	})
 
 	s.AssertExpectations(t)
 	r.AssertExpectations(t)
