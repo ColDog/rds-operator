@@ -1,0 +1,3 @@
+apiVersion: rds.aws.com/v1alpha1
+kind: Database
+projectName: rds-operator
