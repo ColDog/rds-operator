@@ -17,4 +17,19 @@ dep:
 .PHONY: dep
 
 release: build
+	docker push $(IMAGE)
 .PHONY: release
+
+deploy:
+	helm template \
+		--values values.yaml \
+		--name rds-operator \
+		./charts/rds-operator | kubectl apply -f -
+.PHONY: deploy
+
+delete:
+	helm template \
+		--values values.yaml \
+		--name rds-operator \
+		./charts/rds-operator | kubectl delete -f -
+.PHONY: delete
