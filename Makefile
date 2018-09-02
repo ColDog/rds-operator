@@ -1,5 +1,9 @@
 IMAGE := coldog/rds-operator:latest
 
+test:
+	go test -cover ./pkg/...
+.PHONY: test
+
 generate:
 	./build/codegen/update-generated.sh
 .PHONY: generate

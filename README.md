@@ -1,5 +1,41 @@
 # RDS Operator
 
+
+## Usage
+
+Install the operator:
+
+```bash
+helm template --name rds-operator --namespace kube-system ./charts/rds-operator | kubectl create -f -
+```
+
+Check on the operator status:
+
+```bash
+kubectl -n kube-system get pods | grep rds-operator
+```
+
+Apply a database:
+
+```bash
+cat <<EOF | kubectl create -f -
+apiVersion: "rds.aws.com/v1alpha1"
+kind: "Database"
+metadata:
+  name: "example"
+  namespace: "default"
+spec:
+  engine: postgres
+  engineVersion: "10.4"
+EOF
+```
+
+Fetch the database:
+
+```bash
+kubectl get databases -o yaml
+```
+
 ## Example
 
 ```yaml
