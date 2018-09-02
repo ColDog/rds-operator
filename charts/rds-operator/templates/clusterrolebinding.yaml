@@ -1,0 +1,17 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: {{ template "rds-operator.fullname" . }}
+  labels:
+    app: {{ template "rds-operator.name" . }}
+    chart: {{ template "rds-operator.chart" . }}
+    release: {{ .Release.Name }}
+    version: "{{ .Chart.Version }}"
+subjects:
+- kind: ServiceAccount
+  name: {{ template "rds-operator.fullname" . }}
+  namespace: "{{ .Release.Namespace }}"
+roleRef:
+  kind: ClusterRole
+  name: {{ template "rds-operator.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io

@@ -5,7 +5,7 @@
 image:
   repository: coldog/rds-operator
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 # We usually recommend not to specify default resources and to leave this as a
 # conscious choice for the user. This also increases chances charts run on

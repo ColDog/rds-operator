@@ -1,13 +1,12 @@
-kind: Role
+kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: {{ template "rds-operator.fullname" . }}
-  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "rds-operator.name" . }}
     chart: {{ template "rds-operator.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    version: "{{ .Chart.Version }}"
 rules:
 - apiGroups:
   - rds.aws.com
