@@ -7,11 +7,12 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+# We usually recommend not to specify default resources and to leave this as a
+# conscious choice for the user. This also increases chances charts run on
+# environments with little resources, such as Minikube. If you do want to
+# specify resources, uncomment the following lines, adjust them as necessary,
+# and remove the curly braces after 'resources:'.
+resources:
   # limits:
   #  cpu: 100m
   #  memory: 128Mi
@@ -19,8 +20,27 @@ resources: {}
   #  cpu: 100m
   #  memory: 128Mi
 
-nodeSelector: {}
+nodeSelector:
 
-tolerations: []
+tolerations:
 
-affinity: {}
+affinity:
+
+# Additional environment variables to pass along to the operator. The below
+# example shows adding configuration for an aws access key from a secret.
+env:
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: aws-access-key
+  #       key: key
+  # - name: AWS_SECRET_ACCESS_KEY
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: aws-access-key
+  #       key: secret
+  # - name: AWS_DEFAULT_REGION
+  #   value: us-west-2
+
+# A blank watch namespace indicates this will watch all namespaces.
+watchNamespace: ""
