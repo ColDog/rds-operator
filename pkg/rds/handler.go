@@ -2,6 +2,7 @@ package rds
 
 import (
 	"context"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -30,6 +31,7 @@ func (sdkWrap) Update(object sdk.Object) error { return sdk.Update(object) }
 // NewHandler returns a new handler instantiating and AWS client.
 func NewHandler() (sdk.Handler, error) {
 	awsSession, err := session.NewSession(&aws.Config{
+		Region: str(os.Getenv("AWS_REGION")),
 		CredentialsChainVerboseErrors: aws.Bool(true),
 	})
 	if err != nil {
@@ -171,10 +173,8 @@ func (h *Handler) getDB(cr *v1alpha1.Database) error {
 }
 
 func (h *Handler) createDB(cr *v1alpha1.Database) (*rds.DBInstance, error) {
-	log.WithField("db", dbName(cr)).Debug("creating db")
-
 	spec := cr.Spec
-	out, err := h.rds.CreateDBInstance(&rds.CreateDBInstanceInput{
+	req := &rds.CreateDBInstanceInput{
 		DBInstanceIdentifier:    str(dbName(cr)),
 		MasterUsername:          str(spec.Username),
 		MasterUserPassword:      str(spec.Password),
@@ -193,6 +193,13 @@ func (h *Handler) createDB(cr *v1alpha1.Database) (*rds.DBInstance, error) {
 		MultiAZ:                 bo(spec.MultiAZ),
 		StorageEncrypted:        bo(spec.Encrypted),
 		VpcSecurityGroupIds:     strs(spec.SecurityGroups),
-	})
+	}
+
+	log.WithField("db", dbName(cr)).
+		WithField("instance", req).
+		WithField("resource", cr).
+		Debug("creating db")
+
+	out, err := h.rds.CreateDBInstance(req)
 	return out.DBInstance, err
 }

@@ -81,6 +81,7 @@ func Defaults(db *Database) {
 	if s.Storage == 0 {
 		s.Storage = 20
 	}
+	db.Spec = s
 }
 
 // DatabaseStatus holds state and error structs.

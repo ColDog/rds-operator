@@ -6,17 +6,23 @@ import (
 	"time"
 
 	"github.com/coldog/rds-operator/pkg/rds"
+	"github.com/coldog/rds-operator/version"
 	"github.com/operator-framework/operator-sdk/pkg/sdk"
 	"github.com/operator-framework/operator-sdk/pkg/util/k8sutil"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 func printVersion() {
-	logrus.Infof("Go Version: %s", runtime.Version())
-	logrus.Infof("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH)
-	logrus.Infof("operator-sdk Version: %v", sdkVersion.Version)
+	log.SetLevel(log.DebugLevel)
+	log.WithFields(log.Fields{
+		"goVersion":  runtime.Version(),
+		"goOs":       runtime.GOOS,
+		"goArch":     runtime.GOARCH,
+		"sdkVersion": sdkVersion.Version,
+		"rdsVersion": version.Version,
+	}).Info("starting")
 }
 
 func main() {
@@ -26,17 +32,24 @@ func main() {
 
 	handler, err := rds.NewHandler()
 	if err != nil {
-		logrus.Fatalf("failed init handler: %v", err)
+		log.WithError(err).Fatal("failed init handler")
 	}
 
 	resource := "rds.aws.com/v1alpha1"
 	kind := "Database"
 	namespace, err := k8sutil.GetWatchNamespace()
 	if err != nil {
-		logrus.Fatalf("failed to get watch namespace: %v", err)
+		log.WithError(err).Fatal("failed watch namespace")
 	}
 	resyncPeriod := time.Duration(5) * time.Second
-	logrus.Infof("Watching %s, %s, %s, %d", resource, kind, namespace, resyncPeriod)
+
+	log.WithFields(log.Fields{
+		"resource":     resource,
+		"kind":         kind,
+		"namespace":    namespace,
+		"resyncPeriod": resyncPeriod,
+	}).Info("watching")
+
 	sdk.Watch(resource, kind, namespace, resyncPeriod)
 	sdk.Handle(handler)
 	sdk.Run(context.Background())
